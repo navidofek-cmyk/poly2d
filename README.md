@@ -20,6 +20,30 @@ Program `poly2d` generuje dva případy (jádro mesheru je ale plně obecné):
 <p align="center"><i>rect: polygonální jádro + prism u všech stěn a válce &nbsp;•&nbsp;
 airfoil: odstupňované jádro (jemné u profilu → hrubé u farfieldu) + mezní vrstva</i></p>
 
+## Ukázky
+
+**NACA 0012 v kruhovém farfieldu (úhel náběhu 10°)**
+
+![Profil s okolní sítí](docs/images/airfoil_profile.png)
+
+Pravidelné polyhedrální (honeycomb) jádro odstupňované k farfieldu, strukturovaná
+mezní vrstva a spojitý přechod 1 prisma → 1 polyhedron.
+
+| náběžná hrana | odtoková hrana | detail špičky TE |
+|:---:|:---:|:---:|
+| ![LE](docs/images/airfoil_le.png) | ![TE](docs/images/airfoil_te.png) | ![TE tip](docs/images/airfoil_te_tip.png) |
+
+Mezní vrstva **obtáčí ostrou odtokovou hranu** soustřednými dráhami (zaoblení
+konvexního vrcholu vějířem oblouků).
+
+Celá doména (⌀ 10 m):
+
+![Celá doména](docs/images/airfoil_full.png)
+
+**Obdélníkový kanál 50 × 15 cm s válcem ⌀ 4 cm**
+
+![Obdélník s válcem](docs/images/rect_full.png)
+
 ## Sestavení a spuštění
 
 ```bash
