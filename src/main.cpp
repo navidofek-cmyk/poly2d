@@ -119,14 +119,15 @@ static void caseAirfoil() {
     // Sharp trailing edge -> the prism layer wraps continuously around the whole
     // airfoil (as in the reference), with no blunt base and no gap.
     auto af = naca0012(chord, {-0.5, 0.0}, nPerSide, aoaDeg, /*sharpTE*/ true);
-    // Prism tangential spacing matches the near-airfoil core size so the
-    // prism->polyhedral interface is continuous (no scalloping / kinks).
-    dom.addPolyLoop(af, "airfoil", /*hole*/ true, 0.015, afPrism);
+    // Fine wall resolution; prism tangential spacing matches the near-airfoil
+    // core size so the prism->polyhedral interface is continuous (1 prism : 1
+    // polyhedron).
+    dom.addPolyLoop(af, "airfoil", /*hole*/ true, 0.008, afPrism);
     dom.build();
 
     const int afLoop = 1; // farfield=0, airfoil=1
     const double band = afPrism.totalThickness();   // prism band thickness
-    const double hWall = 0.015;                      // core size at the prism front
+    const double hWall = 0.008;                      // core size at the prism front
     Mesher::Options mo;
     // Hold the core size equal to the prism tangential spacing until the prism
     // front, then grade outward. This makes the first polyhedral cells the same
@@ -136,7 +137,8 @@ static void caseAirfoil() {
         const double dd = std::max(0.0, d - band);   // distance beyond the prism front
         return std::clamp(hWall + 0.13 * dd, hWall, 0.6);
     };
-    mo.lloydIters = 5;    // regular, rounded polyhedral cells (ANSYS-like)
+    mo.lloydIters = 5;          // regular, rounded polyhedral cells (ANSYS-like)
+    mo.transitionRing = true;   // exact 1 prism : 1 polyhedron at the interface
     io::FoamOptions fo;
     fo.scale = 1.0;       // already metres
     fo.thickness = 0.05;

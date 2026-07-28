@@ -91,7 +91,7 @@ private:
     bool inPrismBand(const Vec2& p) const {
         // Keep the free (relaxed) core clear of the prism band (and of the
         // aligned transition ring, if enabled, which sits ~0.5 h beyond it).
-        const double margin = (opt_.transitionRing ? 1.3 : 0.6) * sizeAt(p);
+        const double margin = (opt_.transitionRing ? 1.5 : 0.6) * sizeAt(p);
         for (const auto& [seg, band] : prismSegs_)
             if (Domain::segDistance(p, *seg) < band + margin) return true;
         return false;
