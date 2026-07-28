@@ -105,7 +105,7 @@ static void caseAirfoil() {
     Domain dom;
     const double chord = 1.0, R = 5.0;
     dom.addCircle({0, 0}, R, "farfield", 0.35, /*hole*/ false); // outer, no prism
-    PrismSpec afPrism{15, 0.005, 1.2};
+    PrismSpec afPrism{15, 0.005, 1.1};   // thinner boundary layer (total ~0.16 m)
     auto af = naca0012(chord, {-0.5, 0.0}, 140);
     dom.addPolyLoop(af, "airfoil", /*hole*/ true, 0.01, afPrism);
     dom.build();
