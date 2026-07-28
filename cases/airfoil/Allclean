@@ -1,0 +1,7 @@
+#!/bin/sh
+cd "${0%/*}" || exit 1
+rm -rf constant/polyMesh
+rm -rf processor* postProcessing
+# remove written time directories (keep 0)
+for d in [1-9]*; do [ -d "$d" ] && rm -rf "$d"; done
+rm -f case.foam

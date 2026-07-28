@@ -1,0 +1,20 @@
+#!/bin/sh
+# Build the mesher, generate the polyhedral mesh, import it and run the solver.
+cd "${0%/*}" || exit 1
+root=../..
+
+# 1) build poly2d and generate the airfoil mesh
+( cd "$root" \
+    && cmake -S . -B build -DCMAKE_BUILD_TYPE=Release >/dev/null \
+    && cmake --build build -j >/dev/null \
+    && ./build/poly2d airfoil >/dev/null )
+
+# 2) import the polyhedral mesh into this case
+rm -rf constant/polyMesh
+cp -r "$root/out/airfoil/constant/polyMesh" constant/
+
+# 3) check and solve  (OpenFOAM foundation v11+/v14: foamRun -> incompressibleFluid)
+checkMesh || true
+foamRun
+
+# Open with ParaView:  touch case.foam && paraview case.foam

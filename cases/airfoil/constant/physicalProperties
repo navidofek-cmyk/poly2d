@@ -1,0 +1,16 @@
+/*--------------------------------*- C++ -*----------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      physicalProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+viscosityModel  constant;
+
+// air at ~15 C ; chord = 1 m, U = 30 m/s -> Re = U*c/nu = 2e6
+nu              1.5e-05;
+
+// ************************************************************************* //

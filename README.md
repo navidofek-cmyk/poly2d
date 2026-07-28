@@ -112,6 +112,13 @@ Patche pro `airfoil`: `farfield` (patch), `airfoil` (wall), `frontAndBack` (empt
 Patche pro `rect`: `inlet`, `outlet` (patch), `top`, `bottom`, `cylinder` (wall),
 `frontAndBack` (empty). Typ patche lze změnit přes `FoamOptions::patchType`.
 
+**Hotový OpenFOAM case** pro profil je v `cases/airfoil/` (ustálené nestlačitelné
+RANS, k‑ω SST, `foamRun`/`incompressibleFluid`, OpenFOAM v11+/14). Spuštění:
+
+```bash
+cd cases/airfoil && ./Allrun    # sestaví mesher, vygeneruje a naimportuje síť, spustí solver
+```
+
 ## Vlastní doména
 
 ```cpp
