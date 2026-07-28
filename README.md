@@ -110,9 +110,11 @@ python3 scripts/plot_mesh.py out/airfoil/mesh.vtk preview.png     # PNG náhled 
 
 * Delaunay je jednoduchý `O(n²)` Bowyer–Watson — dostatečný pro řádově tisíce až
   desetitisíce jader. Pro velmi jemné sítě by chtěl prostorové vyhledávání.
-* Profil má **tenkou tupou odtokovou hranu** (open-TE koeficient, tloušťka
-  ~0,25 % tětivy). Na TE základně se prism vrstvy negenerují (`Loop::prismSkip`),
-  takže úplav vyplní polygonální jádro místo dlouhého prism ostnu. Ostrou
-  (nulově tenkou) TE lze zapnout přes `naca0012(..., sharpTE=true)`.
+* Profil má **ostrou odtokovou hranu** a prism vrstva ji obtéká **spojitě**
+  dokola (vrstvy se u TE sbíhají a pokračují do úplavu). Prism tangenciální
+  krok je sladěný s velikostí jádra u profilu, takže přechod prism→polygony je
+  plynulý bez zubů. Alternativně lze zapnout **tenkou tupou TE** přes
+  `naca0012(..., sharpTE=false)` a vynechat prism na TE základně přes
+  `Loop::prismSkip` (úplav pak vyplní polygonální jádro).
 * `size field`, počet a růst vrstev, tloušťka extruze i škála jsou parametry v
   `src/main.cpp`.

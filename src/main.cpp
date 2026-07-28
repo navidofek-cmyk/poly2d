@@ -115,24 +115,20 @@ static void caseAirfoil() {
     dom.addCircle({0, 0}, R, "farfield", 0.35, /*hole*/ false); // outer, no prism
     PrismSpec afPrism{15, 0.005, 1.1};   // thinner boundary layer (total ~0.16 m)
     const double aoaDeg = 10.0;
-    const int nPerSide = 140;
-    auto af = naca0012(chord, {-0.5, 0.0}, nPerSide, aoaDeg, /*sharpTE*/ false);
-    // The two trailing-edge nodes (upper/lower TE); used to skip prism on the
-    // thin TE base -- robust under rotation (angle of attack).
-    const Vec2 teU = af[nPerSide];
-    const Vec2 teL = af[nPerSide + 1];
-    dom.addPolyLoop(af, "airfoil", /*hole*/ true, 0.01, afPrism);
-    auto same = [](const Vec2& p, const Vec2& q) { return dist(p, q) < 1e-9; };
-    dom.loops.back().prismSkip = [=](const Vec2& a, const Vec2& b) {
-        return (same(a, teU) && same(b, teL)) || (same(a, teL) && same(b, teU));
-    };
+    const int nPerSide = 160;
+    // Sharp trailing edge -> the prism layer wraps continuously around the whole
+    // airfoil (as in the reference), with no blunt base and no gap.
+    auto af = naca0012(chord, {-0.5, 0.0}, nPerSide, aoaDeg, /*sharpTE*/ true);
+    // Prism tangential spacing matches the near-airfoil core size so the
+    // prism->polyhedral interface is continuous (no scalloping / kinks).
+    dom.addPolyLoop(af, "airfoil", /*hole*/ true, 0.015, afPrism);
     dom.build();
 
     const int afLoop = 1; // farfield=0, airfoil=1
     Mesher::Options mo;
     mo.sizeField = [&dom, afLoop](Vec2 p) {
         const double d = dom.distanceToLoop(p, afLoop);
-        return std::clamp(0.02 + 0.14 * d, 0.02, 0.6);    // fine at airfoil -> coarse farfield
+        return std::clamp(0.015 + 0.14 * d, 0.015, 0.6);  // fine at airfoil -> coarse farfield
     };
     mo.lloydIters = 5;    // regular, rounded polyhedral cells (ANSYS-like)
     io::FoamOptions fo;
