@@ -101,6 +101,7 @@ static void caseRect() {
         const double d = dist(p, cc) - 2.0;               // distance from cylinder
         return std::clamp(0.45 + 0.12 * d, 0.45, 1.1);    // fine near cylinder
     };
+    mo.lloydIters = 4;    // regular, rounded polyhedral cells
     io::FoamOptions fo;
     fo.scale = 0.01;      // cm -> m
     fo.thickness = 0.01;  // 1 cm in z
@@ -113,13 +114,17 @@ static void caseAirfoil() {
     const double chord = 1.0, R = 5.0;
     dom.addCircle({0, 0}, R, "farfield", 0.35, /*hole*/ false); // outer, no prism
     PrismSpec afPrism{15, 0.005, 1.1};   // thinner boundary layer (total ~0.16 m)
-    auto af = naca0012(chord, {-0.5, 0.0}, 140, /*aoa*/ 0.0, /*sharpTE*/ false);
+    const double aoaDeg = 10.0;
+    const int nPerSide = 140;
+    auto af = naca0012(chord, {-0.5, 0.0}, nPerSide, aoaDeg, /*sharpTE*/ false);
+    // The two trailing-edge nodes (upper/lower TE); used to skip prism on the
+    // thin TE base -- robust under rotation (angle of attack).
+    const Vec2 teU = af[nPerSide];
+    const Vec2 teL = af[nPerSide + 1];
     dom.addPolyLoop(af, "airfoil", /*hole*/ true, 0.01, afPrism);
-    // No prism on the thin TE base (its two nodes are at the chord tip x=+0.5);
-    // the near-wake is filled by the polygonal core instead of a prism tail.
-    const double tipx = -0.5 + chord;
-    dom.loops.back().prismSkip = [tipx](const Vec2& a, const Vec2& b) {
-        return std::abs(a.x - tipx) < 1e-9 && std::abs(b.x - tipx) < 1e-9;
+    auto same = [](const Vec2& p, const Vec2& q) { return dist(p, q) < 1e-9; };
+    dom.loops.back().prismSkip = [=](const Vec2& a, const Vec2& b) {
+        return (same(a, teU) && same(b, teL)) || (same(a, teL) && same(b, teU));
     };
     dom.build();
 
@@ -129,6 +134,7 @@ static void caseAirfoil() {
         const double d = dom.distanceToLoop(p, afLoop);
         return std::clamp(0.02 + 0.14 * d, 0.02, 0.6);    // fine at airfoil -> coarse farfield
     };
+    mo.lloydIters = 5;    // regular, rounded polyhedral cells (ANSYS-like)
     io::FoamOptions fo;
     fo.scale = 1.0;       // already metres
     fo.thickness = 0.05;

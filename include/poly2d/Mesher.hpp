@@ -44,6 +44,7 @@ public:
         std::function<double(Vec2)> sizeField;  // target edge length h(x); required
         unsigned seed = 1234567u;                // RNG seed (deterministic)
         int poissonTries = 30;                   // Bridson candidate attempts
+        int lloydIters = 0;                      // Lloyd relaxation passes on core
     };
 
     Mesher(const Domain& dom, Options opt) : dom_(dom), opt_(std::move(opt)) {}
@@ -106,7 +107,65 @@ private:
         poissonCore();
         prismRings();
         dedupReal();
-        mirrorSeeds();
+        lloydRelax(opt_.lloydIters);
+        ghost_ = computeMirrors(real_);
+    }
+
+    // Lloyd relaxation: move each *core* seed to its Voronoi-cell centroid a few
+    // times. Prism seeds stay fixed (structured layers), so only the polyhedral
+    // core is smoothed into regular, rounded cells (ANSYS-like honeycomb).
+    void lloydRelax(int iters) {
+        for (int it = 0; it < iters; ++it) {
+            const int nReal = (int)real_.size();
+            std::vector<Vec2> ghosts = computeMirrors(real_);
+            std::vector<Vec2> all;
+            all.reserve(nReal + ghosts.size());
+            for (const auto& s : real_) all.push_back(s.p);
+            for (const auto& g : ghosts) all.push_back(g);
+
+            Triangulation T = triangulate(all);
+            std::vector<std::vector<int>> inc(all.size());
+            for (int ti = 0; ti < (int)T.tris.size(); ++ti) {
+                inc[T.tris[ti].a].push_back(ti);
+                inc[T.tris[ti].b].push_back(ti);
+                inc[T.tris[ti].c].push_back(ti);
+            }
+            for (int v = 0; v < nReal; ++v) {
+                if (real_[v].type != 0) continue;         // move core only
+                auto& tris = inc[v];
+                if ((int)tris.size() < 3) continue;
+                const Vec2 c = real_[v].p;
+                std::sort(tris.begin(), tris.end(), [&](int i, int k) {
+                    const Vec2 pi = T.tris[i].cc - c, pk = T.tris[k].cc - c;
+                    return std::atan2(pi.y, pi.x) < std::atan2(pk.y, pk.x);
+                });
+                std::vector<Vec2> poly;
+                poly.reserve(tris.size());
+                for (int ti : tris) poly.push_back(T.tris[ti].cc);
+                const Vec2 g = polygonCentroid(poly);
+                if (validCore(g)) real_[v].p = g;          // full Lloyd step
+            }
+        }
+    }
+
+    static Vec2 polygonCentroid(const std::vector<Vec2>& p) {
+        double A = 0.0;
+        Vec2 c{0.0, 0.0};
+        const int n = (int)p.size();
+        for (int i = 0; i < n; ++i) {
+            const Vec2& a = p[i];
+            const Vec2& b = p[(i + 1) % n];
+            const double cr = cross(a, b);
+            A += cr;
+            c.x += (a.x + b.x) * cr;
+            c.y += (a.y + b.y) * cr;
+        }
+        if (std::abs(A) < 1e-30) {                        // degenerate -> average
+            Vec2 m{0, 0};
+            for (const auto& q : p) { m.x += q.x; m.y += q.y; }
+            return {m.x / n, m.y / n};
+        }
+        return {c.x / (3.0 * A), c.y / (3.0 * A)};
     }
 
     // --- graded Poisson-disk (Bridson) over the core region -----------------
@@ -246,12 +305,11 @@ private:
     }
 
     // --- reflect near-boundary seeds so cells conform to the walls ----------
-    void mirrorSeeds() {
+    std::vector<Vec2> computeMirrors(const std::vector<Seed>& seeds) const {
         const auto& segs = dom_.segments();
         std::vector<Vec2> ghosts;
-        for (const auto& s : real_) {
+        for (const auto& s : seeds) {
             const double band = 0.9 * sizeAt(s.p);
-            // collect nearby segments
             std::vector<std::pair<double, int>> near;
             for (int i = 0; i < (int)segs.size(); ++i) {
                 const double d = Domain::segDistance(s.p, segs[i]);
@@ -274,9 +332,11 @@ private:
         tmp.reserve(ghosts.size());
         for (const auto& g : ghosts)
             if (!dom_.inside(g)) tmp.push_back({g, -1});
-        double tol = diag_ * 1e-4;
-        tmp = weld(tmp, tol);
-        for (const auto& t : tmp) ghost_.push_back(t.p);
+        tmp = weld(tmp, diag_ * 1e-4);
+        std::vector<Vec2> out;
+        out.reserve(tmp.size());
+        for (const auto& t : tmp) out.push_back(t.p);
+        return out;
     }
 
     // ------------------------------------------------------------- Voronoi

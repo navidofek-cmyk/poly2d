@@ -15,7 +15,7 @@ Program `poly2d` generuje dva případy (jádro mesheru je ale plně obecné):
 | případ | doména | vnitřní těleso | prism |
 |--------|--------|----------------|-------|
 | `rect` | obdélník 50 × 15 cm | kruh ⌀ 4 cm ve středu | 5 vrstev na stěnách, 6 na válci |
-| `airfoil` | kruh ⌀ 10 m | profil **NACA 0012**, tětiva 1 m | **15 vrstev** na profilu, 1. buňka **0,005 m**, growth 1,1 |
+| `airfoil` | kruh ⌀ 10 m | profil **NACA 0012**, tětiva 1 m, úhel náběhu **10°** | **15 vrstev** na profilu, 1. buňka **0,005 m**, growth 1,1 |
 
 <p align="center"><i>rect: polygonální jádro + prism u všech stěn a válce &nbsp;•&nbsp;
 airfoil: odstupňované jádro (jemné u profilu → hrubé u farfieldu) + mezní vrstva</i></p>
@@ -49,7 +49,11 @@ out/rect/constant/polyMesh/       # OpenFOAM síť (points, faces, owner, neighb
    zrcadlením.
 4. **Voronoi.** Buňky jsou duálem Delaunay triangulace (Bowyer–Watson); vrcholy
    Voronoi buněk jsou opsané kružnice trojúhelníků → sdílené hrany jsou přesné.
-5. **Úklid.** Hraniční uzly se promítnou na stěnu, splynulé uzly se svaří a
+5. **Lloydova relaxace** (volitelně, `Options::lloydIters`). Jádrová jádra se
+   několikrát posunou do těžiště své Voronoi buňky → pravidelné, zaoblené
+   polygony (šestiúhelníkový „honeycomb" jako v komerčních řešičích). Prism
+   jádra zůstávají pevná, takže mezní vrstva zůstane strukturovaná.
+6. **Úklid.** Hraniční uzly se promítnou na stěnu, splynulé uzly se svaří a
    degenerované buňky se zahodí — výsledek je vodotěsný.
 
 ## Export do OpenFOAM 14
