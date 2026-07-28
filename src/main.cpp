@@ -113,7 +113,7 @@ static void caseAirfoil() {
     Domain dom;
     const double chord = 1.0, R = 5.0;
     dom.addCircle({0, 0}, R, "farfield", 0.35, /*hole*/ false); // outer, no prism
-    PrismSpec afPrism{15, 0.005, 1.1};   // thinner boundary layer (total ~0.16 m)
+    PrismSpec afPrism{15, 0.005, 1.05};  // thin boundary layer (total ~0.11 m)
     const double aoaDeg = 10.0;
     const int nPerSide = 160;
     // Sharp trailing edge -> the prism layer wraps continuously around the whole
@@ -125,10 +125,16 @@ static void caseAirfoil() {
     dom.build();
 
     const int afLoop = 1; // farfield=0, airfoil=1
+    const double band = afPrism.totalThickness();   // prism band thickness
+    const double hWall = 0.015;                      // core size at the prism front
     Mesher::Options mo;
-    mo.sizeField = [&dom, afLoop](Vec2 p) {
+    // Hold the core size equal to the prism tangential spacing until the prism
+    // front, then grade outward. This makes the first polyhedral cells the same
+    // size as the prism columns -> one prism connects to one polyhedron.
+    mo.sizeField = [&dom, afLoop, band, hWall](Vec2 p) {
         const double d = dom.distanceToLoop(p, afLoop);
-        return std::clamp(0.015 + 0.14 * d, 0.015, 0.6);  // fine at airfoil -> coarse farfield
+        const double dd = std::max(0.0, d - band);   // distance beyond the prism front
+        return std::clamp(hWall + 0.13 * dd, hWall, 0.6);
     };
     mo.lloydIters = 5;    // regular, rounded polyhedral cells (ANSYS-like)
     io::FoamOptions fo;

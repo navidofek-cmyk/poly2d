@@ -15,7 +15,7 @@ Program `poly2d` generuje dva případy (jádro mesheru je ale plně obecné):
 | případ | doména | vnitřní těleso | prism |
 |--------|--------|----------------|-------|
 | `rect` | obdélník 50 × 15 cm | kruh ⌀ 4 cm ve středu | 5 vrstev na stěnách, 6 na válci |
-| `airfoil` | kruh ⌀ 10 m | profil **NACA 0012**, tětiva 1 m, úhel náběhu **10°** | **15 vrstev** na profilu, 1. buňka **0,005 m**, growth 1,1 |
+| `airfoil` | kruh ⌀ 10 m | profil **NACA 0012**, tětiva 1 m, úhel náběhu **10°** | **15 vrstev** na profilu, 1. buňka **0,005 m**, growth 1,05 |
 
 <p align="center"><i>rect: polygonální jádro + prism u všech stěn a válce &nbsp;•&nbsp;
 airfoil: odstupňované jádro (jemné u profilu → hrubé u farfieldu) + mezní vrstva</i></p>
@@ -55,6 +55,12 @@ out/rect/constant/polyMesh/       # OpenFOAM síť (points, faces, owner, neighb
    jádra zůstávají pevná, takže mezní vrstva zůstane strukturovaná.
 6. **Úklid.** Hraniční uzly se promítnou na stěnu, splynulé uzly se svaří a
    degenerované buňky se zahodí — výsledek je vodotěsný.
+
+**Přechod prism → polyhedra.** Aby na každý prism sloupec navazoval jeden
+polyhedron (a rozhraní bylo spojité bez zubů), drží size field velikost jádra
+rovnou tangenciálnímu kroku prism vrstvy až k jejímu čelu a odstupňovává se až
+za ním. Volitelně (`Options::transitionRing`) lze vložit prstenec polygonů
+zarovnaný přesně 1:1 s prism sloupci.
 
 ## Export do OpenFOAM 14
 

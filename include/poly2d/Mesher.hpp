@@ -45,6 +45,7 @@ public:
         unsigned seed = 1234567u;                // RNG seed (deterministic)
         int poissonTries = 30;                   // Bridson candidate attempts
         int lloydIters = 0;                      // Lloyd relaxation passes on core
+        bool transitionRing = false;             // add a 1:1 prism->poly ring
     };
 
     Mesher(const Domain& dom, Options opt) : dom_(dom), opt_(std::move(opt)) {}
@@ -88,7 +89,9 @@ private:
     }
 
     bool inPrismBand(const Vec2& p) const {
-        const double margin = 0.5 * sizeAt(p);
+        // Keep the free (relaxed) core clear of the prism band (and of the
+        // aligned transition ring, if enabled, which sits ~0.5 h beyond it).
+        const double margin = (opt_.transitionRing ? 1.3 : 0.6) * sizeAt(p);
         for (const auto& [seg, band] : prismSegs_)
             if (Domain::segDistance(p, *seg) < band + margin) return true;
         return false;
@@ -258,11 +261,18 @@ private:
                 if (len <= 0.0) continue;
                 const Vec2 inward = normalized(leftNormal(dir));
                 const int sub = std::max(1, (int)std::lround(len / L.hBnd));
+                // One transition polyhedron per prism column, aligned 1:1 with
+                // the layers, sitting just outside the last prism layer. It is
+                // fixed (type 2, not relaxed) so the prism->poly interface stays
+                // one-prism-to-one-polyhedron and continuous.
+                const double toff = L.prism.totalThickness() + 0.5 * L.hBnd;
                 for (int k = 0; k < sub; ++k) {
                     const double t = (k + 0.5) / sub;         // cell-centered
                     const Vec2 base = a + t * dir;
                     for (int layer = 0; layer < L.prism.nLayers; ++layer)
                         real_.push_back({base + L.prism.center(layer) * inward, 1});
+                    if (opt_.transitionRing)
+                        real_.push_back({base + toff * inward, 2}); // transition ring
                 }
             }
         }
