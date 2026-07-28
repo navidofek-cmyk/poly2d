@@ -28,28 +28,29 @@
 using namespace poly2d;
 namespace fs = std::filesystem;
 
-// NACA 0012 closed contour (chord along +x), cosine-clustered at LE/TE.
-//   sharpTE = true : classic closed (zero-thickness) trailing edge point
-//   sharpTE = false: open coefficient -> thin blunt TE (base ~0.0025 c) that
-//                    the prism layers can land on instead of collapsing to a
-//                    single point.
+// NACA 0012 contour (chord along +x), cosine-clustered at LE/TE.
+//   teCut = 1.0 : classic sharp (zero-thickness) trailing-edge point
+//   teCut < 1.0 : truncate at x=teCut -> small blunt trailing edge of finite
+//                 thickness 2*yt(teCut). The short vertical base is kept as a
+//                 boundary edge, so the prism layer wraps continuously around
+//                 the whole profile *including* that small edge.
 static std::vector<Vec2> naca0012(double chord, Vec2 le, int nPerSide,
-                                  double aoaDeg = 0.0, bool sharpTE = true) {
+                                  double aoaDeg = 0.0, double teCut = 1.0) {
     const double t = 0.12;
-    const double c4 = sharpTE ? -0.1036 : -0.1015; // closed vs finite TE
     auto yt = [&](double x) {
         return 5.0 * t * (0.2969 * std::sqrt(x) - 0.1260 * x - 0.3516 * x * x +
-                          0.2843 * x * x * x + c4 * x * x * x * x);
+                          0.2843 * x * x * x - 0.1036 * x * x * x * x);
     };
     std::vector<double> xs(nPerSide + 1);
     for (int i = 0; i <= nPerSide; ++i) {
         const double th = std::numbers::pi * i / nPerSide;
-        xs[i] = 0.5 * (1.0 - std::cos(th)); // 0 -> 1, clustered at ends
+        xs[i] = teCut * 0.5 * (1.0 - std::cos(th)); // 0 -> teCut, clustered at ends
     }
+    const bool blunt = teCut < 1.0 - 1e-9;
     std::vector<Vec2> pts;
     for (int i = 0; i <= nPerSide; ++i) pts.push_back({xs[i], yt(xs[i])});          // upper LE->TE
-    // include the lower TE point for a blunt TE (adds the short base segment)
-    const int loStart = sharpTE ? nPerSide - 1 : nPerSide;
+    // keep the lower TE point for a blunt TE (adds the short base segment)
+    const int loStart = blunt ? nPerSide : nPerSide - 1;
     for (int i = loStart; i >= 1; --i) pts.push_back({xs[i], -yt(xs[i])});          // lower TE->LE
 
     const double c = std::cos(-aoaDeg * std::numbers::pi / 180.0);
@@ -116,13 +117,23 @@ static void caseAirfoil() {
     PrismSpec afPrism{15, 0.005, 1.05};  // thin boundary layer (total ~0.11 m)
     const double aoaDeg = 10.0;
     const int nPerSide = 160;
-    // Sharp trailing edge -> the prism layer wraps continuously around the whole
-    // airfoil (as in the reference), with no blunt base and no gap.
-    auto af = naca0012(chord, {-0.5, 0.0}, nPerSide, aoaDeg, /*sharpTE*/ true);
+    // Small blunt trailing edge (truncate at 94% chord -> TE thickness ~1.7% c).
+    // The prism layer grows continuously around the whole profile including the
+    // small TE base, forming closed boundary-layer lanes that preserve the edge.
+    auto af = naca0012(chord, {-0.5, 0.0}, nPerSide, aoaDeg, /*teCut*/ 0.94);
+    const Vec2 teU = af[nPerSide];       // upper TE corner
+    const Vec2 teL = af[nPerSide + 1];   // lower TE corner
     // Fine wall resolution; prism tangential spacing matches the near-airfoil
     // core size so the prism->polyhedral interface is continuous (1 prism : 1
     // polyhedron).
     dom.addPolyLoop(af, "airfoil", /*hole*/ true, 0.008, afPrism);
+    // Keep the small TE base as a preserved boundary edge but grow NO prism on
+    // it: the boundary-layer lanes wrap the upper/lower surfaces up to the two
+    // TE corners, and the polyhedral core fills the near wake behind the edge.
+    auto same = [](const Vec2& p, const Vec2& q) { return dist(p, q) < 1e-9; };
+    dom.loops.back().prismSkip = [=](const Vec2& a, const Vec2& b) {
+        return (same(a, teU) && same(b, teL)) || (same(a, teL) && same(b, teU));
+    };
     dom.build();
 
     const int afLoop = 1; // farfield=0, airfoil=1
