@@ -29,12 +29,17 @@ using namespace poly2d;
 namespace fs = std::filesystem;
 
 // NACA 0012 closed contour (chord along +x), cosine-clustered at LE/TE.
+//   sharpTE = true : classic closed (zero-thickness) trailing edge point
+//   sharpTE = false: open coefficient -> thin blunt TE (base ~0.0025 c) that
+//                    the prism layers can land on instead of collapsing to a
+//                    single point.
 static std::vector<Vec2> naca0012(double chord, Vec2 le, int nPerSide,
-                                  double aoaDeg = 0.0) {
+                                  double aoaDeg = 0.0, bool sharpTE = true) {
     const double t = 0.12;
+    const double c4 = sharpTE ? -0.1036 : -0.1015; // closed vs finite TE
     auto yt = [&](double x) {
         return 5.0 * t * (0.2969 * std::sqrt(x) - 0.1260 * x - 0.3516 * x * x +
-                          0.2843 * x * x * x - 0.1036 * x * x * x * x);
+                          0.2843 * x * x * x + c4 * x * x * x * x);
     };
     std::vector<double> xs(nPerSide + 1);
     for (int i = 0; i <= nPerSide; ++i) {
@@ -43,7 +48,9 @@ static std::vector<Vec2> naca0012(double chord, Vec2 le, int nPerSide,
     }
     std::vector<Vec2> pts;
     for (int i = 0; i <= nPerSide; ++i) pts.push_back({xs[i], yt(xs[i])});          // upper LE->TE
-    for (int i = nPerSide - 1; i >= 1; --i) pts.push_back({xs[i], -yt(xs[i])});     // lower TE->LE
+    // include the lower TE point for a blunt TE (adds the short base segment)
+    const int loStart = sharpTE ? nPerSide - 1 : nPerSide;
+    for (int i = loStart; i >= 1; --i) pts.push_back({xs[i], -yt(xs[i])});          // lower TE->LE
 
     const double c = std::cos(-aoaDeg * std::numbers::pi / 180.0);
     const double s = std::sin(-aoaDeg * std::numbers::pi / 180.0);
@@ -106,8 +113,14 @@ static void caseAirfoil() {
     const double chord = 1.0, R = 5.0;
     dom.addCircle({0, 0}, R, "farfield", 0.35, /*hole*/ false); // outer, no prism
     PrismSpec afPrism{15, 0.005, 1.1};   // thinner boundary layer (total ~0.16 m)
-    auto af = naca0012(chord, {-0.5, 0.0}, 140);
+    auto af = naca0012(chord, {-0.5, 0.0}, 140, /*aoa*/ 0.0, /*sharpTE*/ false);
     dom.addPolyLoop(af, "airfoil", /*hole*/ true, 0.01, afPrism);
+    // No prism on the thin TE base (its two nodes are at the chord tip x=+0.5);
+    // the near-wake is filled by the polygonal core instead of a prism tail.
+    const double tipx = -0.5 + chord;
+    dom.loops.back().prismSkip = [tipx](const Vec2& a, const Vec2& b) {
+        return std::abs(a.x - tipx) < 1e-9 && std::abs(b.x - tipx) < 1e-9;
+    };
     dom.build();
 
     const int afLoop = 1; // farfield=0, airfoil=1

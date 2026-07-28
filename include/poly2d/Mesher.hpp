@@ -65,20 +65,31 @@ private:
     Vec2 lo_, hi_;
     double diag_ = 1.0;
 
+    // Segments that actually grow prism, with their band thickness. Core seeds
+    // are excluded near these (but not near prism-free walls such as a blunt TE).
+    std::vector<std::pair<const Segment*, double>> prismSegs_;
+
     double sizeAt(const Vec2& p) const { return opt_.sizeField(p); }
 
-    // Distance below which a core seed sits inside a loop's prism band.
     double prismBand(int li) const {
         const auto& pr = dom_.loops[li].prism;
         return (pr.nLayers > 0) ? pr.totalThickness() : 0.0;
     }
 
-    bool inPrismBand(const Vec2& p) const {
-        for (int li = 0; li < (int)dom_.loops.size(); ++li) {
-            const double band = prismBand(li);
-            if (band <= 0.0) continue;
-            if (dom_.distanceToLoop(p, li) < band + 0.5 * sizeAt(p)) return true;
+    void collectPrismSegments() {
+        prismSegs_.clear();
+        for (const auto& s : dom_.segments()) {
+            const Loop& L = dom_.loops[s.loop];
+            if (L.prism.nLayers <= 0) continue;
+            if (L.prismSkip && L.prismSkip(s.a, s.b)) continue;
+            prismSegs_.emplace_back(&s, prismBand(s.loop));
         }
+    }
+
+    bool inPrismBand(const Vec2& p) const {
+        const double margin = 0.5 * sizeAt(p);
+        for (const auto& [seg, band] : prismSegs_)
+            if (Domain::segDistance(p, *seg) < band + margin) return true;
         return false;
     }
 
@@ -91,6 +102,7 @@ private:
         dom_.bbox(lo_, hi_);
         diag_ = dist(lo_, hi_);
 
+        collectPrismSegments();
         poissonCore();
         prismRings();
         dedupReal();
@@ -181,6 +193,7 @@ private:
             for (int i = 0; i < n; ++i) {
                 const Vec2 a = L.nodes[i];
                 const Vec2 b = L.nodes[(i + 1) % n];
+                if (L.prismSkip && L.prismSkip(a, b)) continue;  // e.g. blunt TE base
                 const Vec2 dir = b - a;
                 const double len = norm(dir);
                 if (len <= 0.0) continue;

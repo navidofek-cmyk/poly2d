@@ -18,6 +18,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <functional>
 #include <numbers>
 #include <string>
 #include <vector>
@@ -47,6 +48,10 @@ struct Loop {
     bool hole = false;                // true for interior holes
     double hBnd = 1.0;                // target boundary sampling spacing
     PrismSpec prism;                  // boundary-layer settings for this loop
+    // Optional: return true for a segment (a->b) that must NOT grow prism
+    // layers (e.g. a blunt trailing-edge base). Such segments still conform to
+    // the mesh via mirror seeds, but the core fills right up to them.
+    std::function<bool(const Vec2&, const Vec2&)> prismSkip;
 };
 
 // A single oriented boundary segment with a precomputed inward normal.
