@@ -120,20 +120,14 @@ static void caseAirfoil() {
     // Small blunt trailing edge (truncate at 94% chord -> TE thickness ~1.7% c).
     // The prism layer grows continuously around the whole profile including the
     // small TE base, forming closed boundary-layer lanes that preserve the edge.
-    auto af = naca0012(chord, {-0.5, 0.0}, nPerSide, aoaDeg, /*teCut*/ 0.94);
-    const Vec2 teU = af[nPerSide];       // upper TE corner
-    const Vec2 teL = af[nPerSide + 1];   // lower TE corner
+    // Sharp trailing edge: the prism generator rounds the convex TE vertex with
+    // arc fans, so the boundary-layer lanes wrap smoothly around the trailing
+    // edge (concentric lanes) instead of collapsing to a point.
+    auto af = naca0012(chord, {-0.5, 0.0}, nPerSide, aoaDeg, /*teCut*/ 1.0);
     // Fine wall resolution; prism tangential spacing matches the near-airfoil
     // core size so the prism->polyhedral interface is continuous (1 prism : 1
     // polyhedron).
     dom.addPolyLoop(af, "airfoil", /*hole*/ true, 0.008, afPrism);
-    // Keep the small TE base as a preserved boundary edge but grow NO prism on
-    // it: the boundary-layer lanes wrap the upper/lower surfaces up to the two
-    // TE corners, and the polyhedral core fills the near wake behind the edge.
-    auto same = [](const Vec2& p, const Vec2& q) { return dist(p, q) < 1e-9; };
-    dom.loops.back().prismSkip = [=](const Vec2& a, const Vec2& b) {
-        return (same(a, teU) && same(b, teL)) || (same(a, teL) && same(b, teU));
-    };
     dom.build();
 
     const int afLoop = 1; // farfield=0, airfoil=1

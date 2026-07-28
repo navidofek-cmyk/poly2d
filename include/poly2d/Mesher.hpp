@@ -252,6 +252,16 @@ private:
             const Loop& L = dom_.loops[li];
             if (L.prism.nLayers <= 0) continue;
             const int n = (int)L.nodes.size();
+            const double toff = L.prism.totalThickness() + 0.5 * L.hBnd;
+
+            // radii at which seeds are placed: prism layer centers (type 1) plus
+            // the transition ring (type 2) if enabled.
+            std::vector<std::pair<double, int>> radii;
+            for (int layer = 0; layer < L.prism.nLayers; ++layer)
+                radii.emplace_back(L.prism.center(layer), 1);
+            if (opt_.transitionRing) radii.emplace_back(toff, 2);
+
+            // (a) rows offset along each segment's inward normal
             for (int i = 0; i < n; ++i) {
                 const Vec2 a = L.nodes[i];
                 const Vec2 b = L.nodes[(i + 1) % n];
@@ -261,18 +271,36 @@ private:
                 if (len <= 0.0) continue;
                 const Vec2 inward = normalized(leftNormal(dir));
                 const int sub = std::max(1, (int)std::lround(len / L.hBnd));
-                // One transition polyhedron per prism column, aligned 1:1 with
-                // the layers, sitting just outside the last prism layer. It is
-                // fixed (type 2, not relaxed) so the prism->poly interface stays
-                // one-prism-to-one-polyhedron and continuous.
-                const double toff = L.prism.totalThickness() + 0.5 * L.hBnd;
                 for (int k = 0; k < sub; ++k) {
                     const double t = (k + 0.5) / sub;         // cell-centered
                     const Vec2 base = a + t * dir;
-                    for (int layer = 0; layer < L.prism.nLayers; ++layer)
-                        real_.push_back({base + L.prism.center(layer) * inward, 1});
-                    if (opt_.transitionRing)
-                        real_.push_back({base + toff * inward, 2}); // transition ring
+                    for (auto& [R, type] : radii)
+                        real_.push_back({base + R * inward, type});
+                }
+            }
+
+            // (b) rounded fans at convex vertices: each layer sweeps an arc
+            //     around the corner so the boundary-layer lanes wrap smoothly
+            //     around sharp features (e.g. a sharp trailing edge) instead of
+            //     collapsing to a point.
+            for (int i = 0; i < n; ++i) {
+                const Vec2 vp = L.nodes[(i - 1 + n) % n];
+                const Vec2 v  = L.nodes[i];
+                const Vec2 vn = L.nodes[(i + 1) % n];
+                const Vec2 dP = normalized(v - vp);
+                const Vec2 dN = normalized(vn - v);
+                // signed turning angle; convex (CW hole) vertices fan outward.
+                const double phi = std::atan2(cross(dP, dN), dot(dP, dN));
+                if (phi >= -0.05) continue;                   // ~ skip near-straight
+                const Vec2 nP = normalized(leftNormal(dP));   // inward normal, incoming
+                const double a0 = std::atan2(nP.y, nP.x);
+                for (auto& [R, type] : radii) {
+                    const int steps = std::max(1, (int)std::lround(R * (-phi) / L.hBnd));
+                    for (int k = 1; k < steps; ++k) {         // interior arc points
+                        const double ang = a0 + phi * (double)k / steps;
+                        const Vec2 s = v + Vec2{R * std::cos(ang), R * std::sin(ang)};
+                        if (dom_.inside(s)) real_.push_back({s, type});
+                    }
                 }
             }
         }
