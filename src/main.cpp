@@ -313,10 +313,20 @@ static void runAirfoil(const std::string& name, const AirfoilShape& s) {
 
     const int afLoop = 1;
     const double band = afPrism.totalThickness(), hWall = 0.006;
+    // For a blunt TE, resolve the base with ~5 cells across (refine the size
+    // field near the base to base_thickness / 5).
+    const bool blunt = s.bluntTE;
+    const Vec2 baseMid = blunt ? Vec2{(s.teU.x + s.teL.x) * 0.5, (s.teU.y + s.teL.y) * 0.5} : Vec2{};
+    const double baseH = blunt ? dist(s.teU, s.teL) : 0.0;
     Mesher::Options mo;
-    mo.sizeField = [&dom, afLoop, band, hWall](Vec2 p) {
-        const double d = dom.distanceToLoop(p, afLoop);
-        return std::clamp(hWall + 0.13 * std::max(0.0, d - band), hWall, 0.6);
+    mo.sizeField = [&dom, afLoop, band, hWall, blunt, baseMid, baseH](Vec2 p) {
+        double h = std::clamp(hWall + 0.13 * std::max(0.0, dom.distanceToLoop(p, afLoop) - band),
+                              hWall, 0.6);
+        if (blunt) {                              // ~5 cells across the TE base
+            const double target = baseH / 5.0, db = dist(p, baseMid);
+            h = std::min(h, db < 0.6 * baseH ? target : target + 0.3 * (db - 0.6 * baseH));
+        }
+        return h;
     };
     mo.lloydIters = 5;
     mo.transitionRing = true;
@@ -334,7 +344,7 @@ static void caseProfiles() {
     runAirfoil("naca4412_blunt", placeAirfoil(naca4(4, 4, 12, 160, 0.95), chord, le, aoa));
     AirfoilShape rae = loadSeligDat("data/rae2822.dat");
     runAirfoil("rae2822_sharp", placeAirfoil(rae, chord, le, aoa));
-    runAirfoil("rae2822_blunt", placeAirfoil(truncateTE(rae, 0.95), chord, le, aoa));
+    runAirfoil("rae2822_blunt", placeAirfoil(truncateTE(rae, 0.90), chord, le, aoa));
 }
 
 int main(int argc, char** argv) {
