@@ -13,6 +13,7 @@
 // -----------------------------------------------------------------------------
 #include "poly2d/Domain.hpp"
 #include "poly2d/Mesher.hpp"
+#include "poly2d/io/Extrude3D.hpp"
 #include "poly2d/io/FoamWriter.hpp"
 #include "poly2d/io/SvgWriter.hpp"
 #include "poly2d/io/VtkWriter.hpp"
@@ -239,11 +240,55 @@ static void caseSphereAxi() {
     std::printf("  wrote out/sphere/mesh.{vtk,svg}\n");
 }
 
+// ---- case 4: square block with a square through-hole (duct cross-section) ---
+// This 2D cross-section is prismatic along z, so extruding it gives the 3D mesh
+// of a cube pierced by a square hole. Tests prism layers + arc fans on the
+// right-angle hole corners.
+static void caseDuct() {
+    Domain dom;
+    const double W = 2.0, H = 2.0;
+    dom.addRectangle(0, 0, W, H, "left", "right", "bottom", "top", 0.05,
+                     PrismSpec{8, 0.004, 1.2});
+    // centered square hole
+    const double a = 0.6;
+    const Vec2 c{W / 2, H / 2};
+    std::vector<Vec2> hole = {{c.x - a / 2, c.y - a / 2}, {c.x + a / 2, c.y - a / 2},
+                              {c.x + a / 2, c.y + a / 2}, {c.x - a / 2, c.y + a / 2}};
+    dom.addPolyLoop(hole, "hole", /*hole*/ true, 0.03, PrismSpec{8, 0.003, 1.2});
+    dom.build();
+
+    Mesher::Options mo;
+    mo.sizeField = [c, a](Vec2 p) {
+        const double d = std::max(0.0, std::max(std::abs(p.x - c.x), std::abs(p.y - c.y)) - a / 2);
+        return std::clamp(0.03 + 0.12 * d, 0.03, 0.09);
+    };
+    mo.lloydIters = 5;
+    mo.transitionRing = true;
+    io::FoamOptions fo;
+    fo.scale = 1.0;
+    fo.thickness = 0.05;
+    runCase("duct", dom, mo, fo, 260.0);
+
+    // Extrude the cross-section into a genuine 3D volume mesh: a cube pierced by
+    // a straight square through-hole (z = flow direction).
+    Mesher::Options mo3 = mo;
+    PolyMesh2D mesh = Mesher(dom, mo3).generate();
+    io::Extrude3DOptions eo;
+    eo.nLayers = 24;
+    eo.length = 3.0;      // duct length along z
+    io::Extrude3D ex(dom, eo);
+    fs::create_directories("out/duct3d/constant/polyMesh");
+    ex.write(mesh, "out/duct3d/constant/polyMesh");
+    std::printf("  3D extrude: %d cells, %d faces (%d internal), %d points -> out/duct3d\n",
+                ex.nCells(), ex.nFaces(), ex.nInternalFaces(), ex.nPoints());
+}
+
 int main(int argc, char** argv) {
     std::string which = (argc > 1) ? argv[1] : "both";
     if (which == "rect" || which == "both") caseRect();
     if (which == "airfoil" || which == "both") caseAirfoil();
     if (which == "sphere" || which == "both") caseSphereAxi();
+    if (which == "duct" || which == "both") caseDuct();
     std::puts("done.");
     return 0;
 }

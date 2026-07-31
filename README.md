@@ -70,6 +70,23 @@ Orotováním této 2D sítě kolem osy vznikne 3D síť (v OpenFOAM `wedge`):
 |:---:|:---:|
 | ![3D těleso](docs/images/sphere_3d_body.png) | ![3D koule](docs/images/sphere_3d.png) |
 
+**Kvádr se čtvercovou dírou skrz (3D extruze)**
+
+Prizmatická 3D geometrie (konstantní průřez podél osy) se vysíťuje ve 2D průřezu
+a **vyextruduje** do objemové 3D sítě. Průřez = čtverec s čtvercovou dírou, prism
+vrstvy na obojím; `Extrude3D` z něj udělá N vrstev → skutečná 3D polyMesh
+(`inlet`/`outlet` na koncích, stěny kvádru, `hole` = stěna tunelu). Zde 2451 × 24
+= 58 824 buněk, `checkMesh`-clean.
+
+| průřez (2D) | 3D extruze — tunel skrz |
+|:---:|:---:|
+| ![Průřez](docs/images/duct_section.png) | ![3D](docs/images/duct_3d.png) |
+
+> Pozn.: **Plně 3D** neprizmatická úloha (koule s obecným tělesem) by potřebovala
+> 3D Voronoi mesher (3D duál + 3D marching prism) — to je samostatný, mnohem větší
+> engine. Tento nástroj pokrývá 2D + osově symetrické (revolve/wedge) + prizmatické
+> 3D (extruze).
+
 ## Sestavení a spuštění
 
 ```bash
