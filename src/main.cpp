@@ -14,6 +14,7 @@
 #include "poly2d/Domain.hpp"
 #include "poly2d/Mesher.hpp"
 #include "poly2d/io/Extrude3D.hpp"
+#include "poly2d/io/Revolve3D.hpp"
 #include "poly2d/io/FoamWriter.hpp"
 #include "poly2d/io/SvgWriter.hpp"
 #include "poly2d/io/VtkWriter.hpp"
@@ -238,6 +239,16 @@ static void caseSphereAxi() {
     io::writeVtk(mesh, "out/sphere/mesh.vtk");
     io::writeSvg(mesh, "out/sphere/mesh.svg", 90.0);
     std::printf("  wrote out/sphere/mesh.{vtk,svg}\n");
+
+    // Revolve the meridional mesh 360 deg -> full 3D mesh of the body of
+    // revolution inside the sphere.
+    io::Revolve3DOptions ro;
+    ro.nSectors = 48;
+    io::Revolve3D rev(dom, ro);
+    fs::create_directories("out/sphere3d/constant/polyMesh");
+    rev.write(mesh, "out/sphere3d/constant/polyMesh");
+    std::printf("  3D revolve: %d cells, %d faces (%d internal), %d points -> out/sphere3d\n",
+                rev.nCells(), rev.nFaces(), rev.nInternalFaces(), rev.nPoints());
 }
 
 // ---- case 4: square block with a square through-hole (duct cross-section) ---

@@ -76,7 +76,7 @@ def main(d):
     bnd = read_boundary(d + '/boundary')
     nF = len(faces)
     nInt = len(neigh)
-    nCells = max(owner) + 1
+    nCells = max(max(owner), max(neigh) if neigh else 0) + 1
     ok = True
 
     def chk(cond, msg):

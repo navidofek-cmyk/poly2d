@@ -64,11 +64,19 @@ Tenká mezní vrstva se sladěným tangenciálním krokem → spojitý přechod
 
 ![Přechod prism → polyhedra](docs/images/sphere_transition.png)
 
-Orotováním této 2D sítě kolem osy vznikne 3D síť (v OpenFOAM `wedge`):
+Orotováním této 2D sítě kolem osy (`Revolve3D`, 360°/M sektorů) vznikne
+**skutečná objemová 3D polyMesh** tělesa v kouli. Osové uzly (r=0) se svaří do
+jednoho bodu, revoluce se uzavírá (bez čel), degenerované stěny na ose se
+zahodí, orientace se určí přes těžiště buněk. Zde 4071 × 48 = **195 408 buněk**,
+`checkMesh`-clean (buňky uzavřené na 1,9e-16), patche `farfield` a `body`.
 
-| těleso + shell mezní vrstvy | těleso v kouli |
+| těleso + shell mezní vrstvy | těleso v kouli (řez) |
 |:---:|:---:|
 | ![3D těleso](docs/images/sphere_3d_body.png) | ![3D koule](docs/images/sphere_3d.png) |
+
+Příčné řezy (kolmo na osu) revolvované sítě:
+
+![Příčné řezy](docs/images/sphere_sections.png)
 
 **Kvádr se čtvercovou dírou skrz (3D extruze)**
 
