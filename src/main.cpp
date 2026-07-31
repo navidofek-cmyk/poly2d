@@ -150,10 +150,84 @@ static void caseAirfoil() {
     runCase("airfoil", dom, mo, fo, 90.0);
 }
 
+// NACA 0012 half-thickness at chord fraction x in [0,1] (for a body of revolution).
+static double naca0012_yt(double x) {
+    const double t = 0.12;
+    return 5.0 * t * (0.2969 * std::sqrt(x) - 0.1260 * x - 0.3516 * x * x +
+                      0.2843 * x * x * x - 0.1036 * x * x * x * x);
+}
+
+// ---- case 3: NACA 0012 body of revolution inside a sphere (axisymmetric) ----
+// Meshed in the meridional half-plane (x, r>=0): the body sits on the axis
+// (r=0) with radius r=yt(x); the sphere becomes an upper semicircle; the axis
+// segments upstream/downstream of the body are the symmetry axis. Revolving
+// this 2D mesh about the x-axis gives the 3D mesh (OpenFOAM: wedge patches).
+static void caseSphereAxi() {
+    const double R = 5.0, chord = 1.0, x0 = -0.5;
+    const int nb = 180, na = 160;
+
+    std::vector<Vec2> nodes;
+    std::vector<std::string> patch;   // patch of segment nodes[i]->nodes[i+1]
+    auto add = [&](Vec2 p, const std::string& seg) { nodes.push_back(p); patch.push_back(seg); };
+
+    add({-R, 0.0}, "axis");                                   // (-R,0) -> LE : axis
+    std::vector<Vec2> bodyPts;
+    for (int i = 0; i <= nb; ++i) {                           // body upper surface LE->TE
+        const double xl = 0.5 * (1.0 - std::cos(std::numbers::pi * i / nb));
+        const Vec2 p{x0 + chord * xl, chord * naca0012_yt(xl)};
+        bodyPts.push_back(p);
+        add(p, i < nb ? "body" : "axis");                     // TE's outgoing seg -> axis
+    }
+    add({R, 0.0}, "farfield");                                // (R,0) -> arc : farfield
+    for (int j = 1; j < na; ++j) {                            // upper semicircle back to (-R,0)
+        const double th = std::numbers::pi * j / na;
+        add({R * std::cos(th), R * std::sin(th)}, "farfield");
+    }
+
+    Domain dom;
+    Loop L;
+    L.nodes = nodes;
+    L.patch = patch;
+    L.hole = false;
+    L.hBnd = 0.01;
+    L.prism = PrismSpec{15, 0.005, 1.05};
+    // prism only on the body surface (skip the axis and the farfield arc)
+    L.prismSkip = [R](const Vec2& a, const Vec2& b) {
+        const Vec2 m{(a.x + b.x) * 0.5, (a.y + b.y) * 0.5};
+        const bool body = (m.y > 1e-6) && (norm(m) < R - 1e-3);
+        return !body;
+    };
+    dom.loops.push_back(std::move(L));
+    dom.build();
+
+    const double band = dom.loops[0].prism.totalThickness();
+    const double hWall = 0.008;
+    Mesher::Options mo;
+    mo.sizeField = [bodyPts, band, hWall](Vec2 p) {
+        double d = 1e9;
+        for (const auto& b : bodyPts) d = std::min(d, dist(p, b));
+        return std::clamp(hWall + 0.12 * std::max(0.0, d - band), hWall, 0.5);
+    };
+    mo.lloydIters = 5;
+    mo.transitionRing = true;
+
+    std::printf("=== case 'sphere' (axisymmetric meridional plane) ===\n");
+    PolyMesh2D mesh = Mesher(dom, mo).generate();
+    std::size_t prism = 0;
+    for (int t : mesh.cellType) prism += (t == 1);
+    std::printf("  cells: %zu  (prism %zu / core %zu)   nodes: %zu\n",
+                mesh.cells.size(), prism, mesh.cells.size() - prism, mesh.nodes.size());
+    fs::create_directories("out/sphere");
+    io::writeVtk(mesh, "out/sphere/mesh.vtk");
+    io::writeSvg(mesh, "out/sphere/mesh.svg", 90.0);
+    std::printf("  wrote out/sphere/mesh.{vtk,svg}\n");
+}
+
 int main(int argc, char** argv) {
     std::string which = (argc > 1) ? argv[1] : "both";
     if (which == "rect" || which == "both") caseRect();
     if (which == "airfoil" || which == "both") caseAirfoil();
+    if (which == "sphere" || which == "both") caseSphereAxi();
     std::puts("done.");
     return 0;
 }

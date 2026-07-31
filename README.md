@@ -44,6 +44,20 @@ Celá doména (⌀ 10 m):
 
 ![Obdélník s válcem](docs/images/rect_full.png)
 
+**NACA 0012 rotační těleso v kouli (osově symetrické)**
+
+Rotační těleso (profil orotovaný kolem osy tětivy) v kulovém farfieldu je
+osově symetrické → síťuje se **meridiánová polorovina** (x, r ≥ 0): těleso leží
+na ose, koule je horní polokruh. Mezní vrstva obtáčí nos i záď na ose.
+
+![Meridiánová síť u tělesa](docs/images/sphere_body.png)
+
+Orotováním této 2D sítě kolem osy vznikne 3D síť (v OpenFOAM `wedge`):
+
+| těleso + shell mezní vrstvy | těleso v kouli |
+|:---:|:---:|
+| ![3D těleso](docs/images/sphere_3d_body.png) | ![3D koule](docs/images/sphere_3d.png) |
+
 ## Sestavení a spuštění
 
 ```bash
