@@ -40,6 +40,22 @@ Celá doména (⌀ 10 m):
 
 ![Celá doména](docs/images/airfoil_full.png)
 
+**Další profily — NACA 4412 (prohnutý) a RAE 2822 (superkritický)**
+
+Obecný generátor `Airfoils.hpp`: cambered **NACA 4-digit** (počítaný) + loader
+Selig **`.dat`** souborů (RAE 2822 ze skutečných souřadnic, `data/rae2822.dat`).
+Každý profil s **ostrou** i **tupou** odtokovou hranou (`teCut`/`truncateTE`).
+Spuštění: `./build/poly2d profiles` → `out/naca4412_{sharp,blunt}`,
+`out/rae2822_{sharp,blunt}`.
+
+| NACA 4412 (camber, 4° náběh) | RAE 2822 (superkritický) |
+|:---:|:---:|
+| ![4412](docs/images/naca4412.png) | ![RAE2822](docs/images/rae2822.png) |
+
+| RAE 2822 — ostrá TE | NACA 4412 — tupá TE |
+|:---:|:---:|
+| ![RAE TE](docs/images/rae2822_te.png) | ![4412 blunt](docs/images/naca4412_blunt_te.png) |
+
 **Obdélníkový kanál 50 × 15 cm s válcem ⌀ 4 cm**
 
 ![Obdélník s válcem](docs/images/rect_full.png)

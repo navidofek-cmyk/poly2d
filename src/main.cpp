@@ -11,6 +11,7 @@
 //   mesh.svg                  standalone preview
 //   constant/polyMesh/*       OpenFOAM 14 mesh (extruded, empty front/back)
 // -----------------------------------------------------------------------------
+#include "poly2d/Airfoils.hpp"
 #include "poly2d/Domain.hpp"
 #include "poly2d/Mesher.hpp"
 #include "poly2d/io/Extrude3D.hpp"
@@ -294,12 +295,55 @@ static void caseDuct() {
                 ex.nCells(), ex.nFaces(), ex.nInternalFaces(), ex.nPoints());
 }
 
+// Generic airfoil case: any AirfoilShape (already placed in world coords) in a
+// circular farfield, thin prism layer, 1:1 prism->poly transition.
+static void runAirfoil(const std::string& name, const AirfoilShape& s) {
+    Domain dom;
+    dom.addCircle({0, 0}, 5.0, "farfield", 0.35, /*hole*/ false);
+    PrismSpec afPrism{15, 0.0012, 1.06};
+    dom.addPolyLoop(s.pts, "airfoil", /*hole*/ true, 0.006, afPrism);
+    if (s.bluntTE) {
+        const Vec2 teU = s.teU, teL = s.teL;
+        auto same = [](const Vec2& p, const Vec2& q) { return dist(p, q) < 1e-9; };
+        dom.loops.back().prismSkip = [=](const Vec2& a, const Vec2& b) {
+            return (same(a, teU) && same(b, teL)) || (same(a, teL) && same(b, teU));
+        };
+    }
+    dom.build();
+
+    const int afLoop = 1;
+    const double band = afPrism.totalThickness(), hWall = 0.006;
+    Mesher::Options mo;
+    mo.sizeField = [&dom, afLoop, band, hWall](Vec2 p) {
+        const double d = dom.distanceToLoop(p, afLoop);
+        return std::clamp(hWall + 0.13 * std::max(0.0, d - band), hWall, 0.6);
+    };
+    mo.lloydIters = 5;
+    mo.transitionRing = true;
+    io::FoamOptions fo;
+    fo.scale = 1.0;
+    fo.thickness = 0.05;
+    runCase(name, dom, mo, fo, 90.0);
+}
+
+// NACA 4412 and RAE 2822, each with a sharp and a small blunt trailing edge.
+static void caseProfiles() {
+    const double chord = 1.0, aoa = 4.0;
+    const Vec2 le{-0.5, 0.0};
+    runAirfoil("naca4412_sharp", placeAirfoil(naca4(4, 4, 12, 160, 1.00), chord, le, aoa));
+    runAirfoil("naca4412_blunt", placeAirfoil(naca4(4, 4, 12, 160, 0.95), chord, le, aoa));
+    AirfoilShape rae = loadSeligDat("data/rae2822.dat");
+    runAirfoil("rae2822_sharp", placeAirfoil(rae, chord, le, aoa));
+    runAirfoil("rae2822_blunt", placeAirfoil(truncateTE(rae, 0.95), chord, le, aoa));
+}
+
 int main(int argc, char** argv) {
     std::string which = (argc > 1) ? argv[1] : "both";
     if (which == "rect" || which == "both") caseRect();
     if (which == "airfoil" || which == "both") caseAirfoil();
     if (which == "sphere" || which == "both") caseSphereAxi();
     if (which == "duct" || which == "both") caseDuct();
+    if (which == "profiles" || which == "both") caseProfiles();
     std::puts("done.");
     return 0;
 }
