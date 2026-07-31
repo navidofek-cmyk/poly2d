@@ -200,12 +200,18 @@ static void caseSphereAxi() {
     dom.loops.push_back(std::move(L));
     dom.build();
 
+    // Wake refinement: keep the mesh fine along the axis behind the tail (the
+    // trailing edge sits on the axis, so its boundary layer becomes the
+    // axisymmetric wake). These points only drive the size field, not geometry.
+    std::vector<Vec2> refine = bodyPts;
+    for (double xw = 0.5; xw <= 2.0; xw += 0.04) refine.push_back({xw, 0.0});
+
     const double band = dom.loops[0].prism.totalThickness();
     const double hWall = 0.008;
     Mesher::Options mo;
-    mo.sizeField = [bodyPts, band, hWall](Vec2 p) {
+    mo.sizeField = [refine, band, hWall](Vec2 p) {
         double d = 1e9;
-        for (const auto& b : bodyPts) d = std::min(d, dist(p, b));
+        for (const auto& b : refine) d = std::min(d, dist(p, b));
         return std::clamp(hWall + 0.12 * std::max(0.0, d - band), hWall, 0.5);
     };
     mo.lloydIters = 5;
