@@ -170,15 +170,22 @@ static void caseSphereAxi() {
     std::vector<std::string> patch;   // patch of segment nodes[i]->nodes[i+1]
     auto add = [&](Vec2 p, const std::string& seg) { nodes.push_back(p); patch.push_back(seg); };
 
-    add({-R, 0.0}, "axis");                                   // (-R,0) -> LE : axis
+    // Truncate the body at 95% chord -> small blunt tail (a flat disc on the
+    // axis) so the trailing edge is not a mesh singularity, exactly like the
+    // small blunt TE used on the 2D airfoil.
+    const double teCut = 0.95;
+    add({-R, 0.0}, "axis");                                   // (-R,0) -> nose : axis
     std::vector<Vec2> bodyPts;
-    for (int i = 0; i <= nb; ++i) {                           // body upper surface LE->TE
-        const double xl = 0.5 * (1.0 - std::cos(std::numbers::pi * i / nb));
+    for (int i = 0; i <= nb; ++i) {                           // body surface nose -> tail
+        const double xl = teCut * 0.5 * (1.0 - std::cos(std::numbers::pi * i / nb));
         const Vec2 p{x0 + chord * xl, chord * naca0012_yt(xl)};
         bodyPts.push_back(p);
-        add(p, i < nb ? "body" : "axis");                     // TE's outgoing seg -> axis
+        add(p, "body");                    // last body node's seg -> base (also "body")
     }
-    add({R, 0.0}, "farfield");                                // (R,0) -> arc : farfield
+    const Vec2 teU = bodyPts.back();       // tail top corner (x_TE, r_TE)
+    const Vec2 teL{teU.x, 0.0};            // tail on the axis
+    add(teL, "axis");                      // base (teU->teL) is "body"; teL->(R,0) axis
+    add({R, 0.0}, "farfield");             // (R,0) -> arc : farfield
     for (int j = 1; j < na; ++j) {                            // upper semicircle back to (-R,0)
         const double th = std::numbers::pi * j / na;
         add({R * std::cos(th), R * std::sin(th)}, "farfield");
@@ -190,28 +197,31 @@ static void caseSphereAxi() {
     L.patch = patch;
     L.hole = false;
     L.hBnd = 0.01;
-    L.prism = PrismSpec{15, 0.005, 1.05};
-    // prism only on the body surface (skip the axis and the farfield arc)
-    L.prismSkip = [R](const Vec2& a, const Vec2& b) {
+    L.prism = PrismSpec{15, 0.0015, 1.05};   // total ~0.032 (thin vs body radius)
+    // prism only on the body surface (skip the axis, the farfield arc and the
+    // small blunt-tail base)
+    auto same = [](const Vec2& p, const Vec2& q) { return dist(p, q) < 1e-9; };
+    L.prismSkip = [R, teU, teL, same](const Vec2& a, const Vec2& b) {
+        const bool base = (same(a, teU) && same(b, teL)) || (same(a, teL) && same(b, teU));
         const Vec2 m{(a.x + b.x) * 0.5, (a.y + b.y) * 0.5};
-        const bool body = (m.y > 1e-6) && (norm(m) < R - 1e-3);
+        const bool body = (m.y > 1e-6) && (norm(m) < R - 1e-3) && !base;
         return !body;
     };
     dom.loops.push_back(std::move(L));
     dom.build();
 
-    // Wake refinement: keep the mesh fine along the axis behind the tail (the
-    // trailing edge sits on the axis, so its boundary layer becomes the
-    // axisymmetric wake). These points only drive the size field, not geometry.
-    std::vector<Vec2> refine = bodyPts;
-    for (double xw = 0.5; xw <= 2.0; xw += 0.04) refine.push_back({xw, 0.0});
-
+    // Smooth radial grading from the body (incl. the blunt tail corner): no
+    // thin on-axis refinement strip, which would create stretched wake cells.
     const double band = dom.loops[0].prism.totalThickness();
-    const double hWall = 0.008;
+    const double hWall = 0.006;
+    const double xTE = teU.x;
     Mesher::Options mo;
-    mo.sizeField = [refine, band, hWall](Vec2 p) {
+    mo.sizeField = [bodyPts, band, hWall, xTE](Vec2 p) {
         double d = 1e9;
-        for (const auto& b : refine) d = std::min(d, dist(p, b));
+        for (const auto& b : bodyPts) d = std::min(d, dist(p, b));
+        // mild extra refinement in the near wake behind the tail (a region, not
+        // a line) so the transition stays smooth and cells stay well-shaped.
+        if (p.x > xTE && p.y < 0.25) d = std::min(d, 0.5 * (p.x - xTE) + p.y);
         return std::clamp(hWall + 0.12 * std::max(0.0, d - band), hWall, 0.5);
     };
     mo.lloydIters = 5;

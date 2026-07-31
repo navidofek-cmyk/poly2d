@@ -102,7 +102,7 @@ def bodyview(path, out):
     ax.plot_surface(X, Y, Z, color="#d98a3a", alpha=1.0, linewidth=0)
 
     # boundary-layer shell (body offset by the prism-band thickness), translucent
-    band = 0.108
+    band = 0.032
     Xb, Yb, Zb = revolve(x, np.where(r > 1e-6, r + band, r), 90, 0, 1.5*math.pi)
     ax.plot_surface(Xb, Yb, Zb, color="#8fbfe8", alpha=0.18, linewidth=0)
 

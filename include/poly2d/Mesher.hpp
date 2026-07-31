@@ -287,6 +287,12 @@ private:
                 const Vec2 vp = L.nodes[(i - 1 + n) % n];
                 const Vec2 v  = L.nodes[i];
                 const Vec2 vn = L.nodes[(i + 1) % n];
+                // only round genuine prism-band corners: both adjacent segments
+                // must grow prism (otherwise the fan would spill where the layer
+                // ends, e.g. a truncated blunt-tail base).
+                const bool prevPrism = !(L.prismSkip && L.prismSkip(vp, v));
+                const bool nextPrism = !(L.prismSkip && L.prismSkip(v, vn));
+                if (!(prevPrism && nextPrism)) continue;
                 const Vec2 dP = normalized(v - vp);
                 const Vec2 dN = normalized(vn - v);
                 // signed turning angle; convex (CW hole) vertices fan outward.

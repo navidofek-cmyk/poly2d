@@ -52,9 +52,10 @@ na ose, koule je horní polokruh. Mezní vrstva obtáčí nos i záď na ose.
 
 ![Meridiánová síť u tělesa](docs/images/sphere_body.png)
 
-Nos i odtoková hrana se řeší **stejně jako u profilu** (obloukový vějíř kolem
-konvexního vrcholu). TE leží na ose, takže mezní vrstva přejde do jemného
-osově symetrického úplavu (zjemnění size fieldem podél osy):
+Nos se řeší **stejně jako u profilu** (mezní vrstva ho obtočí a uzavře na ose).
+Záď je **malá tupá báze** (těleso uříznuté na 95 % — jako tenká tupá TE u
+profilu), takže není singularita na ose; s tenkou vrstvou přejde do
+pravidelného polyhedrálního úplavu bez špatných elementů:
 
 ![Detail odtokové hrany](docs/images/sphere_te.png)
 
