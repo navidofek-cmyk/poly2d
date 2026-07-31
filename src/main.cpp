@@ -196,8 +196,8 @@ static void caseSphereAxi() {
     L.nodes = nodes;
     L.patch = patch;
     L.hole = false;
-    L.hBnd = 0.01;
-    L.prism = PrismSpec{15, 0.0015, 1.05};   // total ~0.032 (thin vs body radius)
+    L.hBnd = 0.006;                           // tangential step ~ core size (1:1)
+    L.prism = PrismSpec{15, 0.0007, 1.05};    // thin layer, total ~0.015
     // prism only on the body surface (skip the axis, the farfield arc and the
     // small blunt-tail base)
     auto same = [](const Vec2& p, const Vec2& q) { return dist(p, q) < 1e-9; };

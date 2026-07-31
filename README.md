@@ -59,6 +59,11 @@ pravidelného polyhedrálního úplavu bez špatných elementů:
 
 ![Detail odtokové hrany](docs/images/sphere_te.png)
 
+Tenká mezní vrstva se sladěným tangenciálním krokem → spojitý přechod
+1 prisma → 1 polyhedron, jako u profilu:
+
+![Přechod prism → polyhedra](docs/images/sphere_transition.png)
+
 Orotováním této 2D sítě kolem osy vznikne 3D síť (v OpenFOAM `wedge`):
 
 | těleso + shell mezní vrstvy | těleso v kouli |
