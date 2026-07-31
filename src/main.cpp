@@ -114,7 +114,7 @@ static void caseAirfoil() {
     Domain dom;
     const double chord = 1.0, R = 5.0;
     dom.addCircle({0, 0}, R, "farfield", 0.35, /*hole*/ false); // outer, no prism
-    PrismSpec afPrism{15, 0.005, 1.05};  // thin boundary layer (total ~0.11 m)
+    PrismSpec afPrism{15, 0.0012, 1.06};  // thin boundary layer, total ~0.028 (2.8% c)
     const double aoaDeg = 10.0;
     const int nPerSide = 160;
     // Small blunt trailing edge (truncate at 94% chord -> TE thickness ~1.7% c).
@@ -127,12 +127,12 @@ static void caseAirfoil() {
     // Fine wall resolution; prism tangential spacing matches the near-airfoil
     // core size so the prism->polyhedral interface is continuous (1 prism : 1
     // polyhedron).
-    dom.addPolyLoop(af, "airfoil", /*hole*/ true, 0.008, afPrism);
+    dom.addPolyLoop(af, "airfoil", /*hole*/ true, 0.006, afPrism);
     dom.build();
 
     const int afLoop = 1; // farfield=0, airfoil=1
     const double band = afPrism.totalThickness();   // prism band thickness
-    const double hWall = 0.008;                      // core size at the prism front
+    const double hWall = 0.006;                      // core size at the prism front (1:1)
     Mesher::Options mo;
     // Hold the core size equal to the prism tangential spacing until the prism
     // front, then grade outward. This makes the first polyhedral cells the same

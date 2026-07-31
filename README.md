@@ -15,7 +15,7 @@ Program `poly2d` generuje dva případy (jádro mesheru je ale plně obecné):
 | případ | doména | vnitřní těleso | prism |
 |--------|--------|----------------|-------|
 | `rect` | obdélník 50 × 15 cm | kruh ⌀ 4 cm ve středu | 5 vrstev na stěnách, 6 na válci |
-| `airfoil` | kruh ⌀ 10 m | profil **NACA 0012**, tětiva 1 m, úhel náběhu **10°** | **15 vrstev** na profilu, 1. buňka **0,005 m**, growth 1,05 |
+| `airfoil` | kruh ⌀ 10 m | profil **NACA 0012**, tětiva 1 m, úhel náběhu **10°** | **15 vrstev** na profilu, 1. buňka **0,0012 m**, growth 1,06 |
 
 <p align="center"><i>rect: polygonální jádro + prism u všech stěn a válce &nbsp;•&nbsp;
 airfoil: odstupňované jádro (jemné u profilu → hrubé u farfieldu) + mezní vrstva</i></p>
