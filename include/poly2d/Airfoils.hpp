@@ -28,8 +28,14 @@ struct AirfoilShape {
     Vec2 teU{}, teL{};         // trailing-edge corners (blunt TE only)
 };
 
+inline Vec2 lerp(const Vec2& a, const Vec2& b, double t) {
+    return {a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t};
+}
+
 // Cambered NACA 4-digit. camber m [%], position p [tenths], thickness t [%].
-inline AirfoilShape naca4(int mI, int pI, int tI, int nPerSide, double teCut = 1.0) {
+// baseCells: number of segments across a blunt TE base (>=1).
+inline AirfoilShape naca4(int mI, int pI, int tI, int nPerSide, double teCut = 1.0,
+                          int baseCells = 1) {
     const double m = mI / 100.0, p = pI / 10.0, t = tI / 100.0;
     auto yt = [&](double x) {
         return 5.0 * t * (0.2969 * std::sqrt(x) - 0.1260 * x - 0.3516 * x * x +
@@ -53,6 +59,9 @@ inline AirfoilShape naca4(int mI, int pI, int tI, int nPerSide, double teCut = 1
     AirfoilShape s;
     s.bluntTE = blunt;
     for (int i = 0; i <= nPerSide; ++i) s.pts.push_back(up[i]);            // LE -> TE (upper)
+    if (blunt)                                                            // subdivide base
+        for (int k = 1; k < baseCells; ++k)
+            s.pts.push_back(lerp(up[nPerSide], lo[nPerSide], (double)k / baseCells));
     for (int i = (blunt ? nPerSide : nPerSide - 1); i >= 1; --i) s.pts.push_back(lo[i]);
     if (blunt) { s.teU = up[nPerSide]; s.teL = lo[nPerSide]; }
     return s;
@@ -79,13 +88,16 @@ inline AirfoilShape loadSeligDat(const std::string& path) {
 }
 
 // Clip a local-coordinate contour at x = teCut -> small blunt trailing edge.
-inline AirfoilShape truncateTE(const AirfoilShape& in, double teCut) {
+// baseCells: number of segments across the base (>=1).
+inline AirfoilShape truncateTE(const AirfoilShape& in, double teCut, int baseCells = 1) {
     AirfoilShape s;
     for (const auto& p : in.pts) if (p.x <= teCut) s.pts.push_back(p);
     if (s.pts.size() < 3) return in;
     s.bluntTE = true;
     s.teU = s.pts.front();   // first kept (upper, x~teCut)
     s.teL = s.pts.back();    // last kept (lower, x~teCut)
+    for (int k = 1; k < baseCells; ++k)         // subdivide the closing base teL->teU
+        s.pts.push_back(lerp(s.teL, s.teU, (double)k / baseCells));
     return s;
 }
 

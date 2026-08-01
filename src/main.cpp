@@ -300,33 +300,19 @@ static void caseDuct() {
 static void runAirfoil(const std::string& name, const AirfoilShape& s) {
     Domain dom;
     dom.addCircle({0, 0}, 5.0, "farfield", 0.35, /*hole*/ false);
+    // Prism grows continuously around the whole contour, including the (already
+    // subdivided) blunt TE base -> a short structured wake block whose cells the
+    // transition ring caps 1:1 with the polyhedral core.
     PrismSpec afPrism{15, 0.0012, 1.06};
     dom.addPolyLoop(s.pts, "airfoil", /*hole*/ true, 0.006, afPrism);
-    if (s.bluntTE) {
-        const Vec2 teU = s.teU, teL = s.teL;
-        auto same = [](const Vec2& p, const Vec2& q) { return dist(p, q) < 1e-9; };
-        dom.loops.back().prismSkip = [=](const Vec2& a, const Vec2& b) {
-            return (same(a, teU) && same(b, teL)) || (same(a, teL) && same(b, teU));
-        };
-    }
     dom.build();
 
     const int afLoop = 1;
     const double band = afPrism.totalThickness(), hWall = 0.006;
-    // For a blunt TE, resolve the base with ~5 cells across (refine the size
-    // field near the base to base_thickness / 5).
-    const bool blunt = s.bluntTE;
-    const Vec2 baseMid = blunt ? Vec2{(s.teU.x + s.teL.x) * 0.5, (s.teU.y + s.teL.y) * 0.5} : Vec2{};
-    const double baseH = blunt ? dist(s.teU, s.teL) : 0.0;
     Mesher::Options mo;
-    mo.sizeField = [&dom, afLoop, band, hWall, blunt, baseMid, baseH](Vec2 p) {
-        double h = std::clamp(hWall + 0.13 * std::max(0.0, dom.distanceToLoop(p, afLoop) - band),
-                              hWall, 0.6);
-        if (blunt) {                              // ~5 cells across the TE base
-            const double target = baseH / 5.0, db = dist(p, baseMid);
-            h = std::min(h, db < 0.6 * baseH ? target : target + 0.3 * (db - 0.6 * baseH));
-        }
-        return h;
+    mo.sizeField = [&dom, afLoop, band, hWall](Vec2 p) {
+        return std::clamp(hWall + 0.13 * std::max(0.0, dom.distanceToLoop(p, afLoop) - band),
+                          hWall, 0.6);
     };
     mo.lloydIters = 5;
     mo.transitionRing = true;
@@ -341,10 +327,10 @@ static void caseProfiles() {
     const double chord = 1.0, aoa = 4.0;
     const Vec2 le{-0.5, 0.0};
     runAirfoil("naca4412_sharp", placeAirfoil(naca4(4, 4, 12, 160, 1.00), chord, le, aoa));
-    runAirfoil("naca4412_blunt", placeAirfoil(naca4(4, 4, 12, 160, 0.95), chord, le, aoa));
+    runAirfoil("naca4412_blunt", placeAirfoil(naca4(4, 4, 12, 160, 0.95, /*baseCells*/ 5), chord, le, aoa));
     AirfoilShape rae = loadSeligDat("data/rae2822.dat");
     runAirfoil("rae2822_sharp", placeAirfoil(rae, chord, le, aoa));
-    runAirfoil("rae2822_blunt", placeAirfoil(truncateTE(rae, 0.90), chord, le, aoa));
+    runAirfoil("rae2822_blunt", placeAirfoil(truncateTE(rae, 0.90, /*baseCells*/ 5), chord, le, aoa));
 }
 
 int main(int argc, char** argv) {

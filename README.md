@@ -52,9 +52,14 @@ Spuštění: `./build/poly2d profiles` → `out/naca4412_{sharp,blunt}`,
 |:---:|:---:|
 | ![4412](docs/images/naca4412.png) | ![RAE2822](docs/images/rae2822.png) |
 
-| RAE 2822 — ostrá TE | NACA 4412 — tupá TE |
+| RAE 2822 — ostrá TE | NACA 4412 — tupá TE (báze na 5 elementů) |
 |:---:|:---:|
 | ![RAE TE](docs/images/rae2822_te.png) | ![4412 blunt](docs/images/naca4412_blunt_te.png) |
+
+Tupá TE: báze je rozdělená na zadaný počet elementů (`baseCells`, zde 5), na
+kterých roste krátký strukturovaný prism blok napojený 1:1 na polyhedra. (V místě,
+kde se sbíhají mezní vrstvy z horní/spodní plochy a báze, zůstává malá nepravidelná
+přechodová zóna — daň za offsetový přístup bez dedikované TE topologie.)
 
 **Obdélníkový kanál 50 × 15 cm s válcem ⌀ 4 cm**
 
