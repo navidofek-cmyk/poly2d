@@ -32,6 +32,24 @@ inline Vec2 lerp(const Vec2& a, const Vec2& b, double t) {
     return {a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t};
 }
 
+// Interior points of a rounded trailing edge: a downstream semicircle from teU
+// to teL (n-1 points, ordered teU->teL). A rounded (corner-free) TE lets the
+// boundary layer wrap it smoothly -- like the leading edge -- instead of two
+// sharp base corners where the layers collide and distort.
+inline std::vector<Vec2> baseArc(const Vec2& teU, const Vec2& teL, int n) {
+    std::vector<Vec2> out;
+    const Vec2 C{(teU.x + teL.x) * 0.5, (teU.y + teL.y) * 0.5};
+    const Vec2 a{teU.x - C.x, teU.y - C.y};        // |a| = radius
+    Vec2 perp{-a.y, a.x};                          // a rotated +90, same length
+    if (perp.x < 0.0) { perp.x = -perp.x; perp.y = -perp.y; }  // bulge downstream (+x)
+    for (int k = 1; k < n; ++k) {
+        const double th = std::numbers::pi * k / n;
+        out.push_back({C.x + std::cos(th) * a.x + std::sin(th) * perp.x,
+                       C.y + std::cos(th) * a.y + std::sin(th) * perp.y});
+    }
+    return out;
+}
+
 // Cambered NACA 4-digit. camber m [%], position p [tenths], thickness t [%].
 // baseCells: number of segments across a blunt TE base (>=1).
 inline AirfoilShape naca4(int mI, int pI, int tI, int nPerSide, double teCut = 1.0,
@@ -59,9 +77,9 @@ inline AirfoilShape naca4(int mI, int pI, int tI, int nPerSide, double teCut = 1
     AirfoilShape s;
     s.bluntTE = blunt;
     for (int i = 0; i <= nPerSide; ++i) s.pts.push_back(up[i]);            // LE -> TE (upper)
-    if (blunt)                                                            // subdivide base
-        for (int k = 1; k < baseCells; ++k)
-            s.pts.push_back(lerp(up[nPerSide], lo[nPerSide], (double)k / baseCells));
+    if (blunt)                                                            // rounded TE cap
+        for (const auto& q : baseArc(up[nPerSide], lo[nPerSide], baseCells))
+            s.pts.push_back(q);
     for (int i = (blunt ? nPerSide : nPerSide - 1); i >= 1; --i) s.pts.push_back(lo[i]);
     if (blunt) { s.teU = up[nPerSide]; s.teL = lo[nPerSide]; }
     return s;
@@ -96,8 +114,8 @@ inline AirfoilShape truncateTE(const AirfoilShape& in, double teCut, int baseCel
     s.bluntTE = true;
     s.teU = s.pts.front();   // first kept (upper, x~teCut)
     s.teL = s.pts.back();    // last kept (lower, x~teCut)
-    for (int k = 1; k < baseCells; ++k)         // subdivide the closing base teL->teU
-        s.pts.push_back(lerp(s.teL, s.teU, (double)k / baseCells));
+    const auto arc = baseArc(s.teU, s.teL, baseCells);   // teU->teL order
+    for (int k = (int)arc.size() - 1; k >= 0; --k) s.pts.push_back(arc[k]);  // append teL->teU
     return s;
 }
 
